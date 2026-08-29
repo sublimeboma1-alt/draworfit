@@ -161,13 +161,15 @@ AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_S3_BUCKET_NAME')
 AWS_S3_ENDPOINT_URL = os.environ.get('AWS_ENDPOINT_URL', '').rstrip('/') or None
 
 if AWS_STORAGE_BUCKET_NAME and AWS_S3_ENDPOINT_URL:
-    # Keeps all user-uploaded files together in the bucket under media/.
-    AWS_LOCATION = os.environ.get('AWS_S3_MEDIA_PREFIX', 'media').strip('/')
+    # Existing uploads are stored directly under documents/covers/ in the
+    # bucket. Set AWS_S3_MEDIA_PREFIX only if objects are moved under a prefix.
+    AWS_LOCATION = os.environ.get('AWS_S3_MEDIA_PREFIX', '').strip('/')
     AWS_S3_FILE_OVERWRITE = False
     AWS_DEFAULT_ACL = None
-    # URLs returned by ImageField/FileField are public object URLs. Ensure the
-    # bucket's public-read policy permits GET requests for this prefix.
-    AWS_QUERYSTRING_AUTH = False
+    # Give the browser a temporary signed URL for each media object. This keeps
+    # the bucket private while allowing cover images to display in React.
+    AWS_QUERYSTRING_AUTH = os.environ.get('AWS_QUERYSTRING_AUTH', 'true').lower() in ('1', 'true', 'yes')
+    AWS_QUERYSTRING_EXPIRE = int(os.environ.get('AWS_QUERYSTRING_EXPIRE', '3600'))
     AWS_S3_ADDRESSING_STYLE = os.environ.get('AWS_S3_ADDRESSING_STYLE', 'path')
     STORAGES.update({
         'default': {
@@ -180,6 +182,7 @@ if AWS_STORAGE_BUCKET_NAME and AWS_S3_ENDPOINT_URL:
                 'file_overwrite': AWS_S3_FILE_OVERWRITE,
                 'default_acl': AWS_DEFAULT_ACL,
                 'querystring_auth': AWS_QUERYSTRING_AUTH,
+                'querystring_expire': AWS_QUERYSTRING_EXPIRE,
                 'addressing_style': AWS_S3_ADDRESSING_STYLE,
             },
         },
