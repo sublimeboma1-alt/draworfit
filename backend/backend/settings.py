@@ -136,6 +136,43 @@ STATICFILES_DIRS = [FRONTEND_BUILD_DIR] if FRONTEND_BUILD_DIR.exists() else []
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Media uploads use the local filesystem while developing.  On Railway, setting
+# these variables switches Django's default file storage to the S3-compatible
+# bucket automatically:
+# AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION,
+# AWS_ENDPOINT_URL and AWS_S3_BUCKET_NAME.
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_S3_BUCKET_NAME')
+AWS_S3_ENDPOINT_URL = os.environ.get('AWS_ENDPOINT_URL', '').rstrip('/') or None
+
+if AWS_STORAGE_BUCKET_NAME and AWS_S3_ENDPOINT_URL:
+    # Keeps all user-uploaded files together in the bucket under media/.
+    AWS_LOCATION = os.environ.get('AWS_S3_MEDIA_PREFIX', 'media').strip('/')
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_DEFAULT_ACL = None
+    # URLs returned by ImageField/FileField are public object URLs. Ensure the
+    # bucket's public-read policy permits GET requests for this prefix.
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_ADDRESSING_STYLE = os.environ.get('AWS_S3_ADDRESSING_STYLE', 'path')
+    STORAGES = {
+        'default': {
+            'BACKEND': 'storages.backends.s3.S3Storage',
+            'OPTIONS': {
+                'bucket_name': AWS_STORAGE_BUCKET_NAME,
+                'endpoint_url': AWS_S3_ENDPOINT_URL,
+                'region_name': os.environ.get('AWS_DEFAULT_REGION'),
+                'location': AWS_LOCATION,
+                'file_overwrite': AWS_S3_FILE_OVERWRITE,
+                'default_acl': AWS_DEFAULT_ACL,
+                'querystring_auth': AWS_QUERYSTRING_AUTH,
+                'addressing_style': AWS_S3_ADDRESSING_STYLE,
+            },
+        },
+        # JavaScript/CSS stay on Railway; only user-uploaded media uses S3.
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    }
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
