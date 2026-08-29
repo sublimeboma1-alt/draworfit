@@ -22,6 +22,11 @@ from django.views.generic import RedirectView
 
 from .views import react_application, service_worker
 
+# Administration branding.
+admin.site.site_header = 'Administration Draworfit'
+admin.site.site_title = 'Draworfit Admin'
+admin.site.index_title = 'Gestion de Draworfit'
+
 urlpatterns = [
     path('sw.js', service_worker, name='service-worker'),
     path('admin', RedirectView.as_view(url='/admin/', permanent=False)),
