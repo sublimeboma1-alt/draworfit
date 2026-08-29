@@ -50,6 +50,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Serves collectstatic output (including Django admin CSS/JS) on Railway.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -128,13 +130,21 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 FRONTEND_BUILD_DIR = BASE_DIR.parent / 'frontend' / 'dist'
 # Vite puts its CSS/JS assets in frontend/dist/assets.
 STATICFILES_DIRS = [FRONTEND_BUILD_DIR] if FRONTEND_BUILD_DIR.exists() else []
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# WhiteNoise serves the collected static files in production. This must remain
+# configured even when media storage is switched to S3 below.
+STORAGES = {
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 # Media uploads use the local filesystem while developing.  On Railway, setting
 # these variables switches Django's default file storage to the S3-compatible
@@ -153,7 +163,7 @@ if AWS_STORAGE_BUCKET_NAME and AWS_S3_ENDPOINT_URL:
     # bucket's public-read policy permits GET requests for this prefix.
     AWS_QUERYSTRING_AUTH = False
     AWS_S3_ADDRESSING_STYLE = os.environ.get('AWS_S3_ADDRESSING_STYLE', 'path')
-    STORAGES = {
+    STORAGES.update({
         'default': {
             'BACKEND': 'storages.backends.s3.S3Storage',
             'OPTIONS': {
@@ -167,11 +177,7 @@ if AWS_STORAGE_BUCKET_NAME and AWS_S3_ENDPOINT_URL:
                 'addressing_style': AWS_S3_ADDRESSING_STYLE,
             },
         },
-        # JavaScript/CSS stay on Railway; only user-uploaded media uses S3.
-        'staticfiles': {
-            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
-        },
-    }
+    })
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
