@@ -11,7 +11,11 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import pymysql
 
+from pathlib import Path
+import os
+import dj_database_url
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -79,12 +83,16 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_PUBLIC_URL'),
+        conn_max_age=600
+    )
 }
+
+
 
 
 # Password validation
@@ -148,5 +156,6 @@ REST_FRAMEWORK = {
 # React/Vite development server. Replace or extend these values in production.
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
+    'https://draworfit-production.up.railway.app',
     'http://127.0.0.1:5173',
 ]
