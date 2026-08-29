@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-4=hh00*=22kefxaxale0$i1q7z*r^1*4lpscl!_iosj=c$qj7g
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["draworfit-production.up.railway.app"]
 
 
 # Application definition
