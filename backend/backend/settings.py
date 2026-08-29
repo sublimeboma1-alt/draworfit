@@ -48,6 +48,12 @@ INSTALLED_APPS = [
     'les_apps.licenses',
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://draworfit-production.up.railway.app",
+]
+
+
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     # Serves collectstatic output (including Django admin CSS/JS) on Railway.
