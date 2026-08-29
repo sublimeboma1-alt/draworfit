@@ -1,0 +1,10 @@
+{
+  "name": "Draworfit",
+  "short_name": "Draworfit",
+  "description": "Bibliothèque numérique sécurisée",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f3f5f3",
+  "theme_color": "#175c42",
+  "icons": [{ "src": "/static/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
