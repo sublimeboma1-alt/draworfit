@@ -161,9 +161,8 @@ AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_S3_BUCKET_NAME')
 AWS_S3_ENDPOINT_URL = os.environ.get('AWS_ENDPOINT_URL', '').rstrip('/') or None
 
 if AWS_STORAGE_BUCKET_NAME and AWS_S3_ENDPOINT_URL:
-    # Existing uploads are stored directly under documents/covers/ in the
-    # bucket. Set AWS_S3_MEDIA_PREFIX only if objects are moved under a prefix.
-    AWS_LOCATION = os.environ.get('AWS_S3_MEDIA_PREFIX', '').strip('/')
+    # Existing uploads are stored under media/documents/covers/ in the bucket.
+    AWS_LOCATION = os.environ.get('AWS_S3_MEDIA_PREFIX', 'media').strip('/')
     AWS_S3_FILE_OVERWRITE = False
     AWS_DEFAULT_ACL = None
     # Give the browser a temporary signed URL for each media object. This keeps
