@@ -1,4 +1,6 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://draworfit-production.up.railway.app/api'
+// By default, use the API served by the same deployment. This keeps local
+// superadmin accounts separate from production accounts during development.
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `${window.location.origin}/api`
 
 const getAccessToken = () => localStorage.getItem('access_token')
 

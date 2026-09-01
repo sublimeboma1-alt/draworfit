@@ -1,7 +1,7 @@
 /* Compact landscape cards for catalogue and library. */
-.market-grid{grid-template-columns:repeat(auto-fit,minmax(480px,1fr));}
-.market-card{display:grid;grid-template-columns:150px minmax(0,1fr);min-height:175px;}
-.card-image{height:auto;min-height:175px;}
+.market-grid{grid-template-columns:repeat(auto-fit,minmax(400px,1fr));}
+.market-card{display:grid;grid-template-columns:minmax(165px,45%) minmax(0,1fr);min-height:200px;align-items:center;}
+.card-image{width:100%;height:auto;min-height:0;aspect-ratio:16 / 10;align-self:center;}
 .card-image,.card-image img{border-radius:19px 0 0 19px;}
 .market-card-body{align-content:center;padding:.85rem 1rem;}
 .market-card-body em{min-height:0;}
@@ -12,8 +12,8 @@
 
 @media (max-width:760px){
   .market-grid,.document-grid{grid-template-columns:1fr;}
-  .market-card,.document-card{grid-template-columns:115px minmax(0,1fr);min-height:135px;}
-  .card-image{min-height:135px;}
+  .market-card,.document-card{grid-template-columns:42% minmax(0,1fr);min-height:135px;}
+  .card-image{min-height:0;aspect-ratio:16 / 10;}
   .card-image,.card-image img{border-radius:15px 0 0 15px;}
   .market-card-body{padding:.7rem;}
   .market-card-body em,.rating{display:none;}
