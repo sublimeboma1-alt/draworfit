@@ -20,6 +20,7 @@ export function SuperAdminPage({ navigate }) {
   const { user, isLoading, logout } = useAuth(); const [active, setActive] = useState('documents'), [rows, setRows] = useState([]), [categories, setCategories] = useState([]), [dashboard, setDashboard] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState(''), [editing, setEditing] = useState(null), [form, setForm] = useState(defaults())
   const load = async () => { setLoading(true); setError(''); try { const requests = [adminList(active), adminList('dashboard')]; if (active === 'documents') requests.push(adminList('categories')); const [list, overview, categoryList] = await Promise.all(requests); setRows(list.results || list); setDashboard(overview); if (categoryList) setCategories(categoryList.results || categoryList); setEditing(null); setForm(defaults()) } catch { setError("Impossible de charger l’administration.") } finally { setLoading(false) } }
   useEffect(() => { if (user?.is_staff) load() }, [active, user])
+  useEffect(() => { if (!editing) document.querySelector('.admin-form')?.reset() }, [rows, editing])
   if (isLoading) return <p className="page-message">Chargement…</p>
   if (!user) return <SuperAdminLogin />
   if (!user?.is_staff) return <section className="page-message"><h1>Accès refusé</h1><button className="button" onClick={() => navigate('/')}>Retour au site</button></section>
