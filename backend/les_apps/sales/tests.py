@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -29,3 +31,28 @@ class OrderTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn('deja achete', str(response.data))
+
+    @patch('les_apps.sales.views._chariow_checkout')
+    def test_checkout_allows_missing_profile_details_until_redirect(self, mock_checkout):
+        customer = User.objects.create_user(
+            username='guest-buyer',
+            password='safe-password',
+            email='guest@example.com',
+            first_name='',
+            last_name='',
+            phone_number='',
+            country_of_origin='',
+        )
+        document = Document.objects.create(title='Redirected checkout', price=1000, is_published=True, chariow_product_id='prd_123')
+        order = customer.orders.create(status='pending', total_amount=1000)
+        order.items.create(document=document, title=document.title, unit_price=document.price)
+        client = APIClient()
+        client.force_authenticate(customer)
+
+        mock_checkout.return_value = {'data': {'purchase': {'id': 'sale_abc'}, 'step': 'pending', 'payment': {'checkout_url': 'https://example.com/pay'}}}
+
+        response = client.post(reverse('order-checkout', args=[order.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['step'], 'pending')
+        self.assertIn('checkout_url', response.data)

@@ -98,17 +98,18 @@ class OrderViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         product_id = items[0].document.chariow_product_id
         if not product_id:
             return Response({'detail': 'Ce document n’est pas encore configuré pour le paiement.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        # Customer details come from the account, never from the payment page.
-        phone = request.user.phone_number.strip()
+        # Customer details are passed to Chariow only when available; the user can be redirected
+        # to complete the payment flow without being blocked by an incomplete profile.
+        phone = (request.user.phone_number or '').strip()
         country = _country_code(request.user)
-        if not all((request.user.first_name.strip(), request.user.last_name.strip(), phone, country)):
-            return Response({'detail': 'Votre profil doit contenir prénom, nom, téléphone et pays pour le paiement.'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        first_name = (request.user.first_name or '').strip()
+        last_name = (request.user.last_name or '').strip()
         redirect_base = os.environ.get('CHARIOW_REDIRECT_URL') or request.build_absolute_uri('/').rstrip('/')
         payload = {
             'product_id': product_id,
             'email': request.user.email,
-            'first_name': request.user.first_name.strip(),
-            'last_name': request.user.last_name.strip(),
+            'first_name': first_name,
+            'last_name': last_name,
             'phone': {'number': ''.join(char for char in phone if char.isdigit()), 'country_code': country},
             'redirect_url': f'{redirect_base}/documents/{items[0].document.slug}?payment=success&order={order.pk}',
             'custom_metadata': {'order_id': str(order.pk), 'order_ref': f'DRAWORFIT-{order.pk}'},
