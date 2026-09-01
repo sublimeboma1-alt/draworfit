@@ -1,0 +1,15 @@
+import { useEffect, useState } from 'react'
+import { closeSupportConversation, getSupportConversations, replyToSupportConversation } from '../api/support'
+import { useAuth } from '../contexts/AuthContext'
+import './SuperAdminPage.css'
+
+export function AdminSupportPage({ navigate }) {
+  const { user } = useAuth()
+  const [conversations, setConversations] = useState([]), [selectedId, setSelectedId] = useState(null), [reply, setReply] = useState(''), [error, setError] = useState('')
+  const load = () => getSupportConversations().then((data) => { const list = data.results || data; setConversations(list); setSelectedId((id) => id || list[0]?.id || null) }).catch(() => setError('Impossible de charger les messages.'))
+  useEffect(() => { if (user?.is_staff) { load(); const timer = window.setInterval(load, 15000); return () => window.clearInterval(timer) } }, [user])
+  if (!user?.is_staff) return <section className="page-message"><p>Accès administrateur requis.</p><button className="button" onClick={() => navigate('/superadmin')}>Administration</button></section>
+  const active = conversations.find((conversation) => conversation.id === selectedId)
+  const send = async (event) => { event.preventDefault(); if (!reply.trim() || !active) return; try { await replyToSupportConversation(active.id, reply); setReply(''); load() } catch (err) { setError(err.message) } }
+  return <div className="superadmin-shell"><aside className="superadmin-side"><strong>DRAWORFIT</strong><small>SUPERADMIN</small><button onClick={() => navigate('/superadmin')}>← Administration</button><button className="active">Assistance clients</button></aside><main className="superadmin-main support-admin"><header><div><p>ADMINISTRATION</p><h1>Messages d’aide</h1></div></header>{error && <p className="form-error">{error}</p>}<section className="support-inbox"><div className="support-threads">{!conversations.length && <p>Aucun message.</p>}{conversations.map((conversation) => <button className={conversation.id === selectedId ? 'active' : ''} onClick={() => setSelectedId(conversation.id)} key={conversation.id}><strong>{conversation.customer_name}</strong><small>{conversation.customer_email}</small><span>{conversation.status === 'open' ? 'Ouverte' : 'Fermée'} · {conversation.unread_count} non lu(s)</span></button>)}</div><div className="support-admin-thread">{active ? <><header><div><strong>{active.customer_name}</strong><small>{active.customer_email}</small></div>{active.status === 'open' && <button className="link-button" onClick={async () => { await closeSupportConversation(active.id); load() }}>Clore</button>}</header><div className="support-messages">{active.messages.map((message) => <article className={message.is_admin ? 'support-message admin' : 'support-message'} key={message.id}><small>{message.is_admin ? 'Administration' : active.customer_name}</small><p>{message.content}</p></article>)}</div><form onSubmit={send}><textarea value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Répondre au client…" /><button className="button">Envoyer</button></form></> : <p>Sélectionnez une discussion.</p>}</div></section></main></div>
+}

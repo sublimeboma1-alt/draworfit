@@ -13,6 +13,8 @@ class Order(models.Model):
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
     currency = models.CharField(max_length=3, default='XOF')
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_provider = models.CharField(max_length=24, blank=True)
+    provider_sale_id = models.CharField(max_length=80, blank=True, unique=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -31,5 +33,19 @@ class OrderItem(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=('order', 'document'), name='one_document_per_order')]
+
+
+class PaymentWebhookEvent(models.Model):
+    """Persist delivery ids so Chariow retries are harmless across instances."""
+
+    provider = models.CharField(max_length=24, default='chariow')
+    delivery_id = models.CharField(max_length=120, unique=True)
+    event_name = models.CharField(max_length=80)
+    order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_events')
+    payload = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at',)
 
 # Create your models here.

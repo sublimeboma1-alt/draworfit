@@ -11,7 +11,7 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('title', 'category', 'price', 'currency', 'is_published', 'created_at')
+    list_display = ('title', 'category', 'price', 'currency', 'chariow_product_id', 'is_published', 'created_at')
     list_filter = ('is_published', 'category', 'currency')
     search_fields = ('title', 'description')
     prepopulated_fields = {'slug': ('title',)}

@@ -1,0 +1,12 @@
+import { useEffect, useState } from 'react'
+import { getSupportConversation, sendSupportMessage } from '../api/support'
+import { useAuth } from '../contexts/AuthContext'
+
+export function SupportChat({ navigate }) {
+  const { user } = useAuth()
+  const [open, setOpen] = useState(false), [messages, setMessages] = useState([]), [content, setContent] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const load = () => user && getSupportConversation().then((data) => setMessages(data.messages || [])).catch(() => setError('La discussion est indisponible.'))
+  useEffect(() => { if (!open || !user) return undefined; load(); const timer = window.setInterval(load, 15000); return () => window.clearInterval(timer) }, [open, user])
+  const send = async (event) => { event.preventDefault(); if (!content.trim()) return; setBusy(true); setError(''); try { const message = await sendSupportMessage(content); setMessages((items) => [...items, message]); setContent('') } catch (err) { setError(err.message) } finally { setBusy(false) } }
+  return <><button className="support-launcher" type="button" onClick={() => setOpen(true)} aria-label="Ouvrir l’aide">? <span>Besoin d’aide ?</span></button>{open && <div className="support-overlay" role="dialog" aria-modal="true" aria-label="Assistance Draworfit"><section className="support-chat"><header><div><strong>Besoin d’aide ?</strong><small>Écrivez-nous, l’administration vous répondra ici.</small></div><button type="button" onClick={() => setOpen(false)} aria-label="Fermer">×</button></header>{!user ? <div className="support-empty"><p>Connectez-vous pour écrire à l’administration.</p><button className="button" onClick={() => { setOpen(false); navigate('/connexion') }}>Se connecter</button></div> : <><div className="support-messages">{!messages.length && <p className="support-empty">Bonjour ! Décrivez votre problème, nous vous répondrons dès que possible.</p>}{messages.map((message) => <article className={message.is_admin ? 'support-message admin' : 'support-message'} key={message.id}><small>{message.is_admin ? 'Administration' : 'Vous'}</small><p>{message.content}</p></article>)}</div>{error && <p className="form-error">{error}</p>}<form onSubmit={send}><textarea value={content} maxLength="2000" onChange={(event) => setContent(event.target.value)} placeholder="Écrivez votre message…" /><button className="button" disabled={busy}>{busy ? 'Envoi…' : 'Envoyer'}</button></form></>}</section></div>}</>
+}

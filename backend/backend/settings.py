@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'les_apps.documents',
     'les_apps.sales',
     'les_apps.licenses',
+    'les_apps.support',
 ]
 
 CSRF_TRUSTED_ORIGINS = [

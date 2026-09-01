@@ -25,6 +25,9 @@ class Document(models.Model):
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
     price = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=3, default='XOF')
+    # The matching published product in the Chariow store. This stays private:
+    # storefront clients never choose a price or a provider product id.
+    chariow_product_id = models.CharField(max_length=80, blank=True)
     cover_image = models.ImageField(upload_to='documents/covers/', blank=True)
     encrypted_file = models.FileField(upload_to='documents/protected/', blank=True)
     is_published = models.BooleanField(default=False)

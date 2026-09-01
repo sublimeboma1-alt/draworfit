@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/documents/', include('les_apps.documents.urls')),
     path('api/sales/', include('les_apps.sales.urls')),
     path('api/licenses/', include('les_apps.licenses.urls')),
+    path('api/support/', include('les_apps.support.urls')),
 ]
 
 if settings.DEBUG:

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Order, OrderItem
+from .models import Order, OrderItem, PaymentWebhookEvent
 
 
 class OrderItemInline(admin.TabularInline):
@@ -11,7 +11,7 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'customer', 'status', 'total_amount', 'currency', 'created_at')
+    list_display = ('id', 'customer', 'status', 'total_amount', 'currency', 'payment_provider', 'provider_sale_id', 'created_at')
     list_filter = ('status', 'currency')
     search_fields = ('customer__email',)
     inlines = (OrderItemInline,)
@@ -26,5 +26,12 @@ class OrderAdmin(admin.ModelAdmin):
         for item in OrderItem.objects.filter(order__in=pending_orders):
             DocumentLicense.objects.get_or_create(order_item=item)
         self.message_user(request, f'{updated} order(s) confirmed.')
+
+
+@admin.register(PaymentWebhookEvent)
+class PaymentWebhookEventAdmin(admin.ModelAdmin):
+    list_display = ('delivery_id', 'event_name', 'order', 'created_at')
+    search_fields = ('delivery_id', 'order__id')
+    readonly_fields = ('provider', 'delivery_id', 'event_name', 'order', 'payload', 'created_at')
 
 # Register your models here.
