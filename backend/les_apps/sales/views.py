@@ -20,6 +20,24 @@ from .serializers import OrderCreateSerializer, OrderSerializer
 
 CHARIOW_CHECKOUT_URL = 'https://api.chariow.com/v1/checkout'
 
+COUNTRY_CODES = {
+    'senegal': 'SN', 'sénégal': 'SN', 'cote d ivoire': 'CI', 'côte d ivoire': 'CI', 'cote divoire': 'CI',
+    'france': 'FR', 'mali': 'ML', 'guinee': 'GN', 'guinée': 'GN', 'burkina faso': 'BF', 'benin': 'BJ',
+    'bénin': 'BJ', 'cameroun': 'CM', 'gabon': 'GA', 'congo': 'CG', 'rdc': 'CD', 'republique democratique du congo': 'CD',
+    'niger': 'NE', 'togo': 'TG', 'maroc': 'MA', 'algerie': 'DZ', 'algérie': 'DZ', 'tunisie': 'TN',
+}
+PHONE_PREFIX_CODES = {'221': 'SN', '225': 'CI', '223': 'ML', '224': 'GN', '226': 'BF', '229': 'BJ', '237': 'CM', '33': 'FR'}
+
+
+def _country_code(user):
+    country = ' '.join((user.country_of_origin or '').strip().lower().replace("'", ' ').split())
+    if len(country) == 2 and country.isalpha():
+        return country.upper()
+    if country in COUNTRY_CODES:
+        return COUNTRY_CODES[country]
+    digits = ''.join(char for char in (user.phone_number or '') if char.isdigit())
+    return next((code for prefix, code in PHONE_PREFIX_CODES.items() if digits.startswith(prefix)), '')
+
 
 def _chariow_checkout(payload):
     api_key = os.environ.get('CHARIOW_API_KEY')
@@ -80,10 +98,11 @@ class OrderViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         product_id = items[0].document.chariow_product_id
         if not product_id:
             return Response({'detail': 'Ce document n’est pas encore configuré pour le paiement.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        phone = str(request.data.get('phone_number') or request.user.phone_number or '').strip()
-        country = str(request.data.get('country_code') or '').strip().upper()
+        # Customer details come from the account, never from the payment page.
+        phone = request.user.phone_number.strip()
+        country = _country_code(request.user)
         if not all((request.user.first_name.strip(), request.user.last_name.strip(), phone, country)):
-            return Response({'detail': 'Indiquez votre prénom, nom, téléphone et code pays (ex. SN).'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response({'detail': 'Votre profil doit contenir prénom, nom, téléphone et pays pour le paiement.'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
         redirect_base = os.environ.get('CHARIOW_REDIRECT_URL') or request.build_absolute_uri('/').rstrip('/')
         payload = {
             'product_id': product_id,

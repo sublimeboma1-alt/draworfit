@@ -10,8 +10,6 @@ export function DocumentPage({ slug, navigate }) {
   const [existingPurchase, setExistingPurchase] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [phoneNumber, setPhoneNumber] = useState('')
-  const [countryCode, setCountryCode] = useState('')
   const { user } = useAuth()
 
   useEffect(() => {
@@ -35,7 +33,7 @@ export function DocumentPage({ slug, navigate }) {
     try {
       const order = currentPurchase || await createOrder([document.id])
       setPurchase(order)
-      const checkout = await startChariowCheckout(order.id, { phone_number: phoneNumber, country_code: countryCode })
+      const checkout = await startChariowCheckout(order.id, {})
       if (checkout.step === 'completed') setPurchase(checkout.order)
       else if (checkout.checkout_url) { window.location.assign(checkout.checkout_url); return }
       else setError('Le lien de paiement n’a pas été fourni. Réessayez.')
@@ -56,8 +54,6 @@ export function DocumentPage({ slug, navigate }) {
         <p className="price">{document.price} {document.currency}</p>
         {error && <p className="form-error">{error}</p>}
         {(!currentPurchase || currentPurchase.status !== 'paid') && <div className="checkout-details">
-          <label>Téléphone<input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} placeholder={user?.phone_number || '+221 77 000 00 00'} /></label>
-          <label>Code pays<input value={countryCode} onChange={(event) => setCountryCode(event.target.value.toUpperCase())} maxLength="2" placeholder="SN" /></label>
           <button className="button" disabled={busy} onClick={beginPurchase}>{busy ? 'Redirection…' : currentPurchase ? 'Reprendre le paiement Chariow' : 'Payer avec Chariow'}</button>
           <small>Le paiement est traité de manière sécurisée par Chariow.</small>
         </div>}
