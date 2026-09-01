@@ -30,16 +30,17 @@ async function putRecord(licenseId, record) {
   })
 }
 
-export async function saveOfflineDocument(licenseId, blob) {
+export async function saveOfflineDocument(licenseId, blob, installationId) {
   const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, await blob.arrayBuffer())
-  await putRecord(licenseId, { key, iv, encrypted, type: blob.type || 'application/pdf', savedAt: Date.now() })
+  await putRecord(licenseId, { key, iv, encrypted, installationId, type: blob.type || 'application/pdf', savedAt: Date.now() })
 }
 
-export async function getOfflineDocument(licenseId) {
+export async function getOfflineDocument(licenseId, installationId) {
   const record = await getRecord(licenseId)
   if (!record) return null
+  if (record.installationId && record.installationId !== installationId) return null
   const bytes = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: record.iv }, record.key, record.encrypted)
   return new Blob([bytes], { type: record.type })
 }
