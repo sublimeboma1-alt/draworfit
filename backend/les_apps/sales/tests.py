@@ -17,3 +17,15 @@ class OrderTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['status'], 'pending')
+
+    def test_customer_cannot_purchase_the_same_document_twice(self):
+        customer = User.objects.create_user(username='repeat-buyer', password='safe-password')
+        document = Document.objects.create(title='One copy only', price=1000, is_published=True)
+        client = APIClient()
+        client.force_authenticate(customer)
+
+        client.post(reverse('order-list'), {'document_ids': [document.id]}, format='json')
+        response = client.post(reverse('order-list'), {'document_ids': [document.id]}, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('deja achete', str(response.data))

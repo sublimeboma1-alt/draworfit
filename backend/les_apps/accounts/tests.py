@@ -11,6 +11,9 @@ class AuthenticationFlowTests(APITestCase):
             'password': 'secure-pass-123',
             'first_name': 'Amina',
             'last_name': 'Diallo',
+            'phone_number': '+221770000000',
+            'university': 'Universite de Dakar',
+            'country_of_origin': 'Senegal',
         }
 
         response = self.client.post(reverse('accounts:register'), registration, format='json')
@@ -30,3 +33,4 @@ class AuthenticationFlowTests(APITestCase):
         response = self.client.get(reverse('accounts:profile'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['username'], registration['username'])
+        self.assertEqual(response.data['phone_number'], registration['phone_number'])

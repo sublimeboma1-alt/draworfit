@@ -29,8 +29,9 @@ admin.site.index_title = 'Gestion de Draworfit'
 
 urlpatterns = [
     path('sw.js', service_worker, name='service-worker'),
-    path('admin', RedirectView.as_view(url='/admin/', permanent=False)),
+    path('admin', RedirectView.as_view(url='/superadmin/', permanent=False)),
     path('admin/', admin.site.urls),
+    path('api/superadmin/', include('les_apps.accounts.superadmin_urls')),
     path('api/auth/', include('les_apps.accounts.urls')),
     path('api/documents/', include('les_apps.documents.urls')),
     path('api/sales/', include('les_apps.sales.urls')),
