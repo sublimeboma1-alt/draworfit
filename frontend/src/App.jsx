@@ -10,7 +10,9 @@ import { LibraryPage } from './pages/LibraryPage'
 import { ActivatePage } from './pages/ActivatePage'
 import { AboutPage } from './pages/AboutPage'
 import { ReaderPage } from './pages/ReaderPage'
+import { SuperAdminPage } from './pages/SuperAdminPage'
 import './App.css'
+import './product-cards.css'
 import './navigation.css'
 
 function resolvePage(pathname) {
@@ -21,6 +23,7 @@ function resolvePage(pathname) {
   if (pathname === '/bibliotheque') return { page: 'library' }
   if (pathname === '/activation') return { page: 'activate' }
   if (pathname === '/a-propos') return { page: 'about' }
+  if (pathname === '/superadmin') return { page: 'superadmin' }
   if (pathname.startsWith('/lecture/')) return { page: 'reader', licenseId: decodeURIComponent(pathname.slice('/lecture/'.length)) }
   if (pathname.startsWith('/documents/')) return { page: 'document', slug: decodeURIComponent(pathname.slice('/documents/'.length)) }
   return { page: 'home' }
@@ -31,6 +34,7 @@ function App() {
   const navigate = (path) => { window.history.pushState({}, '', path); setRoute(resolvePage(path)) }
   useEffect(() => { const back = () => setRoute(resolvePage(window.location.pathname)); window.addEventListener('popstate', back); return () => window.removeEventListener('popstate', back) }, [])
   if (route.page === 'reader') return <AuthProvider><ReaderPage licenseId={route.licenseId} navigate={navigate} /></AuthProvider>
+  if (route.page === 'superadmin') return <AuthProvider><SuperAdminPage navigate={navigate} /></AuthProvider>
   return <AuthProvider><AppLayout navigate={navigate}>{route.page === 'login' && <LoginPage navigate={navigate} />}{route.page === 'register' && <RegisterPage navigate={navigate} />}{route.page === 'catalog' && <CatalogPage navigate={navigate} />}{route.page === 'library' && <LibraryPage navigate={navigate} />}{route.page === 'activate' && <ActivatePage navigate={navigate} />}{route.page === 'about' && <AboutPage />}{route.page === 'document' && <DocumentPage slug={route.slug} navigate={navigate} />}{route.page === 'home' && <HomePage navigate={navigate} />}</AppLayout></AuthProvider>
 }
 export default App
