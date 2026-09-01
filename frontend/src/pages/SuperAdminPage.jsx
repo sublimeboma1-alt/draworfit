@@ -33,10 +33,10 @@ export function SuperAdminPage({ navigate }) {
       setRows(list.results || list); setDashboard(overview); setEditing(null); setForm({ currency: 'XOF', is_published: false, is_active: true })
     } catch { setError("Impossible de charger l'administration.") } finally { setLoading(false) }
   }
-  useEffect(() => { if (user?.is_superuser) load() }, [active, user])
+  useEffect(() => { if (user?.is_staff) load() }, [active, user])
 
   if (isLoading) return <p className="page-message">Chargement…</p>
-  if (!user?.is_superuser) return <section className="page-message"><h1>Acces refuse</h1><p>Cette interface est reservee aux superadministrateurs.</p><button className="button" onClick={() => navigate('/')}>Retour au site</button></section>
+  if (!user?.is_staff) return <section className="page-message"><h1>Acces refuse</h1><p>Cette interface est reservee aux administrateurs.</p><button className="button" onClick={() => navigate('/')}>Retour au site</button></section>
 
   const config = sections[active]
   const setField = (field, value) => setForm({ ...form, [field]: value })
