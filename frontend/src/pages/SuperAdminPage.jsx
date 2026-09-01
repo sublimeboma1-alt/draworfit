@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminCreate, adminDelete, adminList, adminUpdate } from '../api/superadmin'
+import { getProfile, login } from '../api/auth'
 import { useAuth } from '../contexts/AuthContext'
 import './SuperAdminPage.css'
 
@@ -9,11 +10,18 @@ const label = (value) => labels[value] || value.replaceAll('_', ' ')
 const show = (value) => value === null || value === undefined || value === '' ? '—' : typeof value === 'boolean' ? (value ? 'Oui' : 'Non') : String(value)
 const defaults = () => ({ currency: 'XOF', is_published: false, is_active: true })
 
+function SuperAdminLogin() {
+  const { setUser } = useAuth(); const [username, setUsername] = useState(''), [password, setPassword] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false)
+  const submit = async (event) => { event.preventDefault(); setError(''); setBusy(true); try { await login(username, password); const profile = await getProfile(); if (!profile.is_staff) { localStorage.removeItem('access_token'); localStorage.removeItem('refresh_token'); throw new Error() } setUser(profile) } catch { setError('Identifiants administrateur incorrects.') } finally { setBusy(false) } }
+  return <section className="auth-page"><div className="auth-card"><p className="eyebrow">DRAWORFIT · SUPERADMIN</p><h1>Connexion administrateur</h1><p className="form-subtitle">Accédez à la gestion des documents et des commandes.</p>{error && <p className="form-error">{error}</p>}<form onSubmit={submit}><label>Nom d’utilisateur<input required value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" /></label><label>Mot de passe<input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" /></label><button className="button" disabled={busy}>{busy ? 'Connexion…' : 'Se connecter'}</button></form></div></section>
+}
+
 export function SuperAdminPage({ navigate }) {
   const { user, isLoading, logout } = useAuth(); const [active, setActive] = useState('documents'), [rows, setRows] = useState([]), [categories, setCategories] = useState([]), [dashboard, setDashboard] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState(''), [editing, setEditing] = useState(null), [form, setForm] = useState(defaults())
   const load = async () => { setLoading(true); setError(''); try { const requests = [adminList(active), adminList('dashboard')]; if (active === 'documents') requests.push(adminList('categories')); const [list, overview, categoryList] = await Promise.all(requests); setRows(list.results || list); setDashboard(overview); if (categoryList) setCategories(categoryList.results || categoryList); setEditing(null); setForm(defaults()) } catch { setError("Impossible de charger l’administration.") } finally { setLoading(false) } }
   useEffect(() => { if (user?.is_staff) load() }, [active, user])
   if (isLoading) return <p className="page-message">Chargement…</p>
+  if (!user) return <SuperAdminLogin />
   if (!user?.is_staff) return <section className="page-message"><h1>Accès refusé</h1><button className="button" onClick={() => navigate('/')}>Retour au site</button></section>
   const config = sections[active], set = (field, value) => setForm({ ...form, [field]: value })
   const save = async (event) => { event.preventDefault(); setError(''); try { let body; if (active === 'documents') { body = new FormData(); config.form.forEach((field) => { if (form[field] !== undefined && form[field] !== null) body.append(field, form[field]) }); if (form.cover) body.append('cover_image', form.cover); form.files?.forEach((file) => body.append('encrypted_files', file)) } else body = JSON.stringify(config.form.reduce((data, field) => ({ ...data, [field]: form[field] ?? '' }), {})); editing ? await adminUpdate(active, editing.id, body) : await adminCreate(active, body); await load() } catch { setError("L’enregistrement a échoué. Vérifiez les champs obligatoires.") } }
