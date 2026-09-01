@@ -21,7 +21,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
     lookup_field = 'slug'
 
     def get_queryset(self):
-        queryset = Document.objects.select_related('category')
+        # Avoid one additional query per document while serializing file metadata.
+        queryset = Document.objects.select_related('category').prefetch_related('files')
         if self.request.user.is_authenticated and self.request.user.is_staff:
             return queryset
         return queryset.filter(is_published=True)

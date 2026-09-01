@@ -36,6 +36,7 @@ class Document(models.Model):
 
     class Meta:
         ordering = ('-created_at',)
+        indexes = [models.Index(fields=('is_published', '-created_at'))]
 
     def save(self, *args, **kwargs):
         if not self.slug:

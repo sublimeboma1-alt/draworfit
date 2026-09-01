@@ -9,7 +9,7 @@ const shortDescription = (value) => {
 
 function DocumentCover({ document, index }) {
   const [imageFailed, setImageFailed] = useState(false)
-  if (document.cover_image && !imageFailed) return <img src={document.cover_image} alt={document.title} onError={() => setImageFailed(true)} />
+  if (document.cover_image && !imageFailed) return <img src={document.cover_image} alt={document.title} loading="lazy" decoding="async" onError={() => setImageFailed(true)} />
   return <div className={`book-cover cover-${index % 4}`}><small>{document.category?.name || 'DRAWORFIT'}</small><strong>{document.title}</strong><b>PDF</b></div>
 }
 

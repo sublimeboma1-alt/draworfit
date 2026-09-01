@@ -12,7 +12,7 @@ class LicenseViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return DocumentLicense.objects.filter(
             order_item__order__customer=self.request.user
-        ).select_related('device', 'order_item__document__category')
+        ).select_related('device', 'order_item__document__category').prefetch_related('order_item__document__files')
 
     @decorators.action(detail=False, methods=('post',), serializer_class=ActivateLicenseSerializer)
     def activate(self, request):
