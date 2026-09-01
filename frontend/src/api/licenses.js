@@ -11,8 +11,9 @@ export const revokeLicenseDevice = (id) => apiClient(`/licenses/${id}/revoke-dev
   method: 'POST',
 })
 
-export async function getProtectedDocument(id, installationId) {
-  const response = await fetch(`${API_BASE_URL}/licenses/${id}/read/`, {
+export async function getProtectedDocument(id, installationId, fileId) {
+  const query = fileId ? `?file_id=${encodeURIComponent(fileId)}` : ''
+  const response = await fetch(`${API_BASE_URL}/licenses/${id}/read/${query}`, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem('access_token')}`,
       'X-Draworfit-Installation-ID': installationId || '',

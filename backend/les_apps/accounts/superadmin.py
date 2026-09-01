@@ -1,12 +1,8 @@
-from pathlib import Path
-
 from django.contrib.auth import get_user_model
-from django.db import transaction
-from rest_framework import permissions, serializers, status, viewsets
-from rest_framework.decorators import action
+from rest_framework import permissions, serializers, viewsets
 from rest_framework.response import Response
 
-from les_apps.documents.models import Category, Document
+from les_apps.documents.models import Category, Document, DocumentFile
 from les_apps.licenses.models import Device, DocumentLicense
 from les_apps.sales.models import Order, OrderItem
 
@@ -53,11 +49,15 @@ class CategoryAdminSerializer(serializers.ModelSerializer):
 
 class DocumentAdminSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
+    files = serializers.SerializerMethodField()
 
     class Meta:
         model = Document
-        fields = ('id', 'title', 'slug', 'description', 'category', 'category_name', 'price', 'currency', 'cover_image', 'encrypted_file', 'is_published', 'created_at', 'updated_at')
+        fields = ('id', 'title', 'slug', 'description', 'category', 'category_name', 'price', 'currency', 'cover_image', 'encrypted_file', 'files', 'is_published', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def get_files(self, instance):
+        return [{'id': item.id, 'name': item.name} for item in instance.files.all()]
 
 
 class OrderAdminSerializer(serializers.ModelSerializer):
@@ -109,45 +109,20 @@ class CategoryViewSet(SuperAdminViewSet):
 
 
 class DocumentViewSet(SuperAdminViewSet):
-    queryset = Document.objects.select_related('category').all()
+    queryset = Document.objects.select_related('category').prefetch_related('files').all()
     serializer_class = DocumentAdminSerializer
 
-    @action(detail=False, methods=('post',), url_path='bulk-upload')
-    @transaction.atomic
-    def bulk_upload(self, request):
-        """Create one catalogue document for every PDF sent by the superadmin."""
-        files = request.FILES.getlist('encrypted_files')
-        if not files:
-            raise serializers.ValidationError({'encrypted_files': 'Ajoutez au moins un fichier PDF.'})
-        if any(not file.name.lower().endswith('.pdf') for file in files):
-            raise serializers.ValidationError({'encrypted_files': 'Seuls les fichiers PDF sont acceptés.'})
-        try:
-            category = Category.objects.get(pk=request.data.get('category'))
-        except (Category.DoesNotExist, TypeError, ValueError):
-            raise serializers.ValidationError({'category': 'Choisissez une catégorie existante.'})
-        try:
-            price = float(request.data.get('price'))
-            if price < 0:
-                raise ValueError
-        except (TypeError, ValueError):
-            raise serializers.ValidationError({'price': 'Indiquez un prix valide.'})
+    def _add_files(self, document):
+        for uploaded_file in self.request.FILES.getlist('encrypted_files'):
+            DocumentFile.objects.create(document=document, name=uploaded_file.name[:255], file=uploaded_file)
 
-        created = []
-        for file in files:
-            base_title = Path(file.name).stem[:255] or 'Document'
-            title, number = base_title, 2
-            while Document.objects.filter(title=title).exists():
-                suffix = f' ({number})'
-                title = f'{base_title[:255 - len(suffix)]}{suffix}'
-                number += 1
-            created.append(Document.objects.create(
-                title=title, description=request.data.get('description', ''), category=category,
-                price=price, currency=(request.data.get('currency') or 'XOF').upper()[:3],
-                is_published=str(request.data.get('is_published', '')).lower() in ('true', '1', 'on'),
-                encrypted_file=file,
-            ))
-        return Response(DocumentAdminSerializer(created, many=True, context={'request': request}).data, status=status.HTTP_201_CREATED)
+    def perform_create(self, serializer):
+        document = serializer.save()
+        self._add_files(document)
 
+    def perform_update(self, serializer):
+        document = serializer.save()
+        self._add_files(document)
 
 class OrderViewSet(SuperAdminViewSet):
     queryset = Order.objects.select_related('customer').prefetch_related('items').all()

@@ -4,11 +4,12 @@ import { getInstallationId } from '../security/deviceIdentity'
 import { getOfflineDocument, removeOfflineDocument, saveOfflineDocument } from '../security/offlineDocuments'
 import './ReaderPage.css'
 
-export function ReaderPage({ licenseId, navigate }) {
+export function ReaderPage({ licenseId, fileId, navigate }) {
   const [url, setUrl] = useState(null)
   const [error, setError] = useState('')
   const [offlineCopy, setOfflineCopy] = useState(false)
   const [shield, setShield] = useState(false)
+  const offlineKey = `${licenseId}:${fileId || 'main'}`
 
   useEffect(() => {
     let objectUrl
@@ -19,7 +20,7 @@ export function ReaderPage({ licenseId, navigate }) {
       if (!cancelled) { setOfflineCopy(availableOffline); setUrl(objectUrl) }
     }
     async function openOfflineCopy() {
-      const blob = await getOfflineDocument(licenseId, installationId)
+      const blob = await getOfflineDocument(offlineKey, installationId)
       if (!blob) throw new Error("Ce document n'est pas encore enregistre hors connexion sur cet appareil active.")
       showBlob(blob, true)
     }
@@ -30,12 +31,12 @@ export function ReaderPage({ licenseId, navigate }) {
         return
       }
       try {
-        const blob = await getProtectedDocument(licenseId, installationId)
+        const blob = await getProtectedDocument(licenseId, installationId, fileId)
         showBlob(blob, false)
-        try { await saveOfflineDocument(licenseId, blob, installationId); if (!cancelled) setOfflineCopy(true) } catch { /* Online reading remains available. */ }
+        try { await saveOfflineDocument(offlineKey, blob, installationId); if (!cancelled) setOfflineCopy(true) } catch { /* Online reading remains available. */ }
       } catch (networkError) {
         if (networkError.status === 401 || networkError.status === 403 || networkError.status === 404) {
-          await removeOfflineDocument(licenseId)
+          await removeOfflineDocument(offlineKey)
           if (!cancelled) setError(networkError.message)
           return
         }
@@ -44,7 +45,7 @@ export function ReaderPage({ licenseId, navigate }) {
     }
     openDocument()
     return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl) }
-  }, [licenseId])
+  }, [licenseId, fileId, offlineKey])
 
   useEffect(() => {
     const preventShortcut = (event) => {

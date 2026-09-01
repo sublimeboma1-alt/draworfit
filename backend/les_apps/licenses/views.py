@@ -2,6 +2,7 @@ from django.http import FileResponse
 from rest_framework import decorators, response, status, viewsets
 
 from .models import DocumentLicense
+from les_apps.documents.models import DocumentFile
 from .serializers import ActivateLicenseSerializer, DocumentLicenseSerializer
 
 
@@ -40,7 +41,17 @@ class LicenseViewSet(viewsets.ReadOnlyModelViewSet):
         if license_.device.installation_id != installation_id:
             return response.Response({'detail': 'Ce document est lié à un autre appareil.'}, status=status.HTTP_403_FORBIDDEN)
 
-        document_file = license_.order_item.document.encrypted_file
+        file_id = request.query_params.get('file_id')
+        if file_id:
+            try:
+                document_file = DocumentFile.objects.get(pk=file_id, document=license_.order_item.document).file
+            except DocumentFile.DoesNotExist:
+                return response.Response({'detail': 'Ce fichier ne fait pas partie de ce lot.'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            document_file = license_.order_item.document.encrypted_file
+            if not document_file:
+                first_file = license_.order_item.document.files.first()
+                document_file = first_file.file if first_file else None
         if not document_file:
             return response.Response({'detail': 'Le fichier de ce document est indisponible.'}, status=status.HTTP_404_NOT_FOUND)
 

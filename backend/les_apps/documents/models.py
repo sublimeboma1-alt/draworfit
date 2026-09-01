@@ -41,3 +41,17 @@ class Document(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class DocumentFile(models.Model):
+    """A protected PDF belonging to one catalogue product (a document lot)."""
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='files')
+    name = models.CharField(max_length=255)
+    file = models.FileField(upload_to='documents/protected/')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('id',)
+
+    def __str__(self):
+        return self.name
