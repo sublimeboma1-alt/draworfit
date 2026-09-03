@@ -1,7 +1,9 @@
 import hashlib
 import hmac
 import json
+import logging
 import os
+import re
 from urllib import error, request
 
 from django.db import IntegrityError, transaction
@@ -19,6 +21,7 @@ from .serializers import OrderCreateSerializer, OrderSerializer
 
 
 CHARIOW_CHECKOUT_URL = 'https://api.chariow.com/v1/checkout'
+logger = logging.getLogger(__name__)
 
 COUNTRY_CODES = {
     'senegal': 'SN', 'sénégal': 'SN', 'cote d ivoire': 'CI', 'côte d ivoire': 'CI', 'cote divoire': 'CI',
@@ -47,6 +50,33 @@ def _country_code(user):
     return next((code for prefix, code in PHONE_PREFIX_CODES.items() if digits.startswith(prefix)), '')
 
 
+def _chariow_error_message(status_code, body):
+    """Keep the actionable provider message, including uncommon error shapes."""
+    try:
+        response = json.loads(body)
+    except json.JSONDecodeError:
+        response = None
+    if isinstance(response, dict):
+        message = response.get('message') or response.get('detail') or response.get('error')
+        errors = response.get('errors')
+        if isinstance(errors, dict):
+            details = '; '.join(
+                f'{field}: {", ".join(map(str, value)) if isinstance(value, list) else value}'
+                for field, value in errors.items()
+            )
+            if details:
+                message = f'{message or "Erreur de validation"} ({details})'
+        elif isinstance(errors, list) and errors:
+            message = message or '; '.join(map(str, errors))
+        if message:
+            return str(message)
+    # Chariow can return a non-JSON response during an upstream incident. Keep
+    # a short text fragment visible, never an HTML page or any request secret.
+    text = re.sub(r'<[^>]+>', ' ', body).strip()
+    text = ' '.join(text.split())[:300]
+    return f'Chariow a répondu HTTP {status_code}' + (f' : {text}' if text else '.')
+
+
 def _chariow_checkout(payload):
     api_key = os.environ.get('CHARIOW_API_KEY')
     if not api_key:
@@ -62,19 +92,8 @@ def _chariow_checkout(payload):
             return json.loads(result.read().decode('utf-8'))
     except error.HTTPError as exc:
         body = exc.read().decode('utf-8')
-        try:
-            response = json.loads(body)
-            message = response.get('message') or 'Le paiement ne peut pas être initialisé.'
-            field_errors = response.get('errors') or {}
-            if isinstance(field_errors, dict):
-                details = '; '.join(
-                    f'{field}: {", ".join(value) if isinstance(value, list) else value}'
-                    for field, value in field_errors.items()
-                )
-                if details:
-                    message = f'{message} ({details})'
-        except json.JSONDecodeError:
-            message = 'Le paiement ne peut pas être initialisé.'
+        message = _chariow_error_message(exc.code, body)
+        logger.warning('Chariow checkout rejected: status=%s response=%s', exc.code, body[:2_000])
         raise ChariowError(message, exc.code if 400 <= exc.code < 500 else status.HTTP_502_BAD_GATEWAY) from exc
     except error.URLError as exc:
         raise RuntimeError('Chariow est momentanément inaccessible. Réessayez.') from exc

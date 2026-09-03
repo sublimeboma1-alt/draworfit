@@ -9,6 +9,15 @@ from les_apps.documents.models import Document
 
 
 class OrderTests(TestCase):
+    def test_chariow_error_message_keeps_provider_details(self):
+        from les_apps.sales.views import _chariow_error_message
+
+        self.assertEqual(
+            _chariow_error_message(422, '{"errors":{"phone.number":["The phone number is required."]}}'),
+            'Erreur de validation (phone.number: The phone number is required.)',
+        )
+        self.assertEqual(_chariow_error_message(502, 'Gateway offline'), 'Chariow a répondu HTTP 502 : Gateway offline')
+
     def test_new_order_stays_pending_until_payment_is_confirmed(self):
         customer = User.objects.create_user(username='buyer', password='safe-password')
         document = Document.objects.create(title='Protected file', price=1000, is_published=True)
