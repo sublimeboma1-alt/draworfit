@@ -194,6 +194,16 @@ class OrderViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         return Response({'order': OrderSerializer(order).data, 'step': data.get('step'), 'checkout_url': (data.get('payment') or {}).get('checkout_url')})
 
 
+class SnapOnlyOrderViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Legacy order records only. Payments are handled by the Chariow Snap widget."""
+
+    def get_queryset(self):
+        return Order.objects.filter(customer=self.request.user).prefetch_related('items__document__category')
+
+    def get_serializer_class(self):
+        return OrderCreateSerializer if self.action == 'create' else OrderSerializer
+
+
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])

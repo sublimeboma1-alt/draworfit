@@ -17,7 +17,7 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ('id', 'title', 'slug', 'description', 'category', 'category_id', 'price', 'currency', 'cover_image', 'files', 'is_published', 'created_at', 'updated_at')
+        fields = ('id', 'title', 'slug', 'description', 'category', 'category_id', 'price', 'currency', 'cover_image', 'files', 'chariow_snap_html', 'is_published', 'created_at', 'updated_at')
         read_only_fields = ('id', 'slug', 'created_at', 'updated_at')
 
     def get_files(self, instance):

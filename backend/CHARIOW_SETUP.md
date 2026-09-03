@@ -1,18 +1,12 @@
-# Paiement Chariow
+# Paiement Chariow Snap
 
-Le paiement est intégré au backend Django. Il n'est pas nécessaire de déployer
-`chariow-payment-app` : ce dossier est l'ancien prototype indépendant.
+Chaque livre utilise uniquement le widget Snap de Chariow. Aucune clé API,
+aucun checkout API et aucun webhook ne sont nécessaires.
 
-1. Dans Chariow, créez et publiez un produit téléchargeable par document, avec
-   le même prix et la même devise que le document Draworfit.
-2. Ajoutez les trois variables de `backend/.env.example` dans Railway (ou dans
-   votre environnement de production).
-3. Dans l'administration Draworfit, ouvrez chaque document et renseignez son
-   `chariow_product_id` (format `prd_...`).
-4. Dans Chariow, créez un Pulse HTTPS sur
-   `https://votre-domaine/api/sales/webhooks/chariow/`, pour l'événement
-   `successful.sale`. Copiez son secret dans `CHARIOW_WEBHOOK_SECRET`.
+1. Dans Chariow, ouvrez **Marketing > Snap** et créez un Snap pour le produit.
+2. Copiez le code HTML complet, qui commence par `<div id="chariow-widget"`.
+3. Dans Draworfit > Superadmin > Documents, collez-le dans **Code HTML Snap
+   Chariow** puis enregistrez le livre.
 
-Le webhook signé est la seule preuve de paiement : la redirection client ne
-débloque aucun document. Les livraisons sont dédupliquées en base de données et
-une vente valide crée automatiquement les licences Draworfit.
+Le widget apparaît directement sur la page du livre. Si le champ est vide, le
+livre affiche « Ce livre n’est pas encore disponible à l’achat ».

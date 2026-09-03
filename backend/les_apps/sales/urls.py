@@ -1,10 +1,8 @@
 from rest_framework.routers import DefaultRouter
 
-from django.urls import path
-
-from .views import OrderViewSet, chariow_webhook
+from .views import SnapOnlyOrderViewSet
 
 router = DefaultRouter()
-router.register('orders', OrderViewSet, basename='order')
+router.register('orders', SnapOnlyOrderViewSet, basename='order')
 
-urlpatterns = [path('webhooks/chariow/', chariow_webhook, name='chariow-webhook'), *router.urls]
+urlpatterns = router.urls
