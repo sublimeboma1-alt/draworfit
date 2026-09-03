@@ -95,6 +95,7 @@ def _mark_order_paid(order, sale_id):
     return order
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class OrderViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """Orders stay pending until a payment provider, or an admin, confirms them."""
 
