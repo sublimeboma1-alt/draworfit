@@ -51,7 +51,10 @@ class OrderTests(TestCase):
 
         mock_checkout.return_value = {'data': {'purchase': {'id': 'sale_abc'}, 'step': 'pending', 'payment': {'checkout_url': 'https://example.com/pay'}}}
 
-        response = client.post(reverse('order-checkout', args=[order.id]))
+        response = client.post(reverse('order-checkout', args=[order.id]), {
+            'email': 'guest@example.com', 'first_name': 'Guest', 'last_name': 'Buyer',
+            'phone_number': '771234567', 'country_code': 'SN',
+        })
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['step'], 'pending')
@@ -68,7 +71,10 @@ class OrderTests(TestCase):
         from les_apps.sales.views import ChariowError
         mock_checkout.side_effect = ChariowError('Produit Chariow introuvable.', 422)
 
-        response = client.post(reverse('order-checkout', args=[order.id]))
+        response = client.post(reverse('order-checkout', args=[order.id]), {
+            'first_name': 'Validation', 'last_name': 'Buyer',
+            'phone_number': '771234567', 'country_code': 'SN',
+        })
 
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.data['detail'], 'Produit Chariow introuvable.')

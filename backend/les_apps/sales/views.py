@@ -115,20 +115,38 @@ class OrderViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         product_id = items[0].document.chariow_product_id
         if not product_id:
             return Response({'detail': 'Ce document n’est pas encore configuré pour le paiement.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        # Customer details are passed to Chariow only when available; the user can be redirected
-        # to complete the payment flow without being blocked by an incomplete profile.
-        phone = (request.user.phone_number or '').strip()
-        country = _country_code(request.user)
-        first_name = (request.user.first_name or '').strip()
-        last_name = (request.user.last_name or '').strip()
+        # Chariow requires every customer field.  Checkout values are accepted
+        # here so customers with an older/incomplete profile can still pay.
+        submitted = request.data if isinstance(request.data, dict) else {}
+        phone = str(submitted.get('phone_number') or request.user.phone_number or '').strip()
+        submitted_country = str(submitted.get('country_code') or '').strip().upper()
+        country = submitted_country if len(submitted_country) == 2 and submitted_country.isalpha() else _country_code(request.user)
+        first_name = str(submitted.get('first_name') or request.user.first_name or '').strip()
+        last_name = str(submitted.get('last_name') or request.user.last_name or '').strip()
+        email = str(submitted.get('email') or request.user.email or '').strip()
+        phone_number = ''.join(char for char in phone if char.isdigit())
+        missing = []
+        if not email:
+            missing.append('e-mail')
+        if not first_name:
+            missing.append('prénom')
+        if not last_name:
+            missing.append('nom')
+        if not phone_number:
+            missing.append('numéro de téléphone')
+        if not country:
+            missing.append('code pays (ex. SN, FR)')
+        if missing:
+            return Response({'detail': 'Complétez les informations de paiement : ' + ', '.join(missing) + '.'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
         redirect_base = os.environ.get('CHARIOW_REDIRECT_URL') or request.build_absolute_uri('/').rstrip('/')
         payload = {
             'product_id': product_id,
-            'email': request.user.email,
+            'email': email,
             'first_name': first_name,
             'last_name': last_name,
-            'phone': {'number': ''.join(char for char in phone if char.isdigit()), 'country_code': country},
+            'phone': {'number': phone_number, 'country_code': country},
             'redirect_url': f'{redirect_base}/documents/{items[0].document.slug}?payment=success&order={order.pk}',
+            'customer_ip': (request.META.get('HTTP_X_FORWARDED_FOR') or request.META.get('REMOTE_ADDR') or '').split(',')[0].strip(),
             'custom_metadata': {'order_id': str(order.pk), 'order_ref': f'DRAWORFIT-{order.pk}'},
         }
         try:

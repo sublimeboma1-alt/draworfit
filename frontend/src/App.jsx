@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import { AppLayout } from './components/AppLayout'
-import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { CatalogPage } from './pages/CatalogPage'
@@ -28,7 +27,8 @@ function resolvePage(pathname) {
   if (pathname === '/superadmin/aide') return { page: 'admin-support' }
   if (pathname.startsWith('/lecture/')) return { page: 'reader', licenseId: decodeURIComponent(pathname.slice('/lecture/'.length)), fileId: new URLSearchParams(window.location.search).get('f') }
   if (pathname.startsWith('/documents/')) return { page: 'document', slug: decodeURIComponent(pathname.slice('/documents/'.length)) }
-  return { page: 'home' }
+  // The store is the homepage: visitors see the books immediately.
+  return { page: 'catalog' }
 }
 
 function App() {
@@ -38,6 +38,6 @@ function App() {
   if (route.page === 'reader') return <AuthProvider><ReaderPage licenseId={route.licenseId} fileId={route.fileId} navigate={navigate} /></AuthProvider>
   if (route.page === 'superadmin') return <AuthProvider><SuperAdminPage navigate={navigate} /></AuthProvider>
   if (route.page === 'admin-support') return <AuthProvider><AdminSupportPage navigate={navigate} /></AuthProvider>
-  return <AuthProvider><AppLayout navigate={navigate}>{route.page === 'login' && <LoginPage navigate={navigate} />}{route.page === 'register' && <RegisterPage navigate={navigate} />}{route.page === 'catalog' && <CatalogPage navigate={navigate} />}{route.page === 'library' && <LibraryPage navigate={navigate} />}{route.page === 'activate' && <ActivatePage navigate={navigate} />}{route.page === 'about' && <AboutPage />}{route.page === 'document' && <DocumentPage slug={route.slug} navigate={navigate} />}{route.page === 'home' && <HomePage navigate={navigate} />}</AppLayout></AuthProvider>
+  return <AuthProvider><AppLayout navigate={navigate}>{route.page === 'login' && <LoginPage navigate={navigate} />}{route.page === 'register' && <RegisterPage navigate={navigate} />}{route.page === 'catalog' && <CatalogPage navigate={navigate} />}{route.page === 'library' && <LibraryPage navigate={navigate} />}{route.page === 'activate' && <ActivatePage navigate={navigate} />}{route.page === 'about' && <AboutPage />}{route.page === 'document' && <DocumentPage slug={route.slug} navigate={navigate} />}</AppLayout></AuthProvider>
 }
 export default App

@@ -11,6 +11,7 @@ export function DocumentPage({ slug, navigate }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const { user } = useAuth()
+  const [checkoutDetails, setCheckoutDetails] = useState({ email: '', first_name: '', last_name: '', phone_number: '', country_code: '' })
 
   useEffect(() => {
     getDocument(slug).then((data) => { setDocument(data); setState('ready') }).catch(() => setState('error'))
@@ -24,6 +25,14 @@ export function DocumentPage({ slug, navigate }) {
     }).catch(() => setExistingPurchase(null))
   }, [user, document])
 
+  useEffect(() => {
+    if (!user) return
+    setCheckoutDetails({
+      email: user.email || '', first_name: user.first_name || '', last_name: user.last_name || '',
+      phone_number: user.phone_number || '', country_code: (user.country_of_origin || '').length === 2 ? user.country_of_origin.toUpperCase() : '',
+    })
+  }, [user])
+
   if (state === 'loading') return <p className="page-message">Chargement du document…</p>
   if (state === 'error') return <section className="page-message"><p>Ce document est introuvable.</p><button className="button" onClick={() => navigate('/catalogue')}>Retour au catalogue</button></section>
 
@@ -33,7 +42,7 @@ export function DocumentPage({ slug, navigate }) {
     try {
       const order = currentPurchase || await createOrder([document.id])
       setPurchase(order)
-      const checkout = await startChariowCheckout(order.id, {})
+      const checkout = await startChariowCheckout(order.id, checkoutDetails)
       if (checkout.step === 'completed') setPurchase(checkout.order)
       else if (checkout.checkout_url) { window.location.assign(checkout.checkout_url); return }
       else setError('Le lien de paiement n’a pas été fourni. Réessayez.')
@@ -58,6 +67,11 @@ export function DocumentPage({ slug, navigate }) {
         <p className="price">{document.price} {document.currency}</p>
         {error && <p className="form-error">{error}</p>}
         {(!currentPurchase || currentPurchase.status !== 'paid') && <div className="checkout-details">
+          <label>E-mail<input required type="email" value={checkoutDetails.email} onChange={(event) => setCheckoutDetails({ ...checkoutDetails, email: event.target.value })} /></label>
+          <label>Prénom<input required value={checkoutDetails.first_name} onChange={(event) => setCheckoutDetails({ ...checkoutDetails, first_name: event.target.value })} /></label>
+          <label>Nom<input required value={checkoutDetails.last_name} onChange={(event) => setCheckoutDetails({ ...checkoutDetails, last_name: event.target.value })} /></label>
+          <label>Téléphone<input required type="tel" value={checkoutDetails.phone_number} onChange={(event) => setCheckoutDetails({ ...checkoutDetails, phone_number: event.target.value })} /></label>
+          <label>Code pays<input required maxLength="2" placeholder="SN" value={checkoutDetails.country_code} onChange={(event) => setCheckoutDetails({ ...checkoutDetails, country_code: event.target.value.toUpperCase() })} /></label>
           <button className="button" disabled={busy} onClick={beginPurchase}>{busy ? 'Redirection…' : currentPurchase ? 'Reprendre le paiement Chariow' : 'Payer avec Chariow'}</button>
           <small>Le paiement est traité de manière sécurisée par Chariow.</small>
         </div>}
