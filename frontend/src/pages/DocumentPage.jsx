@@ -5,7 +5,7 @@ function ChariowSnap({ html }) {
   return <iframe
     className="chariow-snap"
     title="Paiement sécurisé Chariow"
-    sandbox="allow-forms allow-popups allow-scripts allow-top-navigation-by-user-activation"
+    sandbox="allow-forms allow-popups allow-scripts allow-same-origin allow-top-navigation-by-user-activation"
     srcDoc={html}
   />
 }
