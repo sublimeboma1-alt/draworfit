@@ -84,7 +84,14 @@ def _chariow_checkout(payload):
     outgoing = request.Request(
         CHARIOW_CHECKOUT_URL,
         data=json.dumps(payload).encode('utf-8'),
-        headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+        # Chariow is protected by Cloudflare. Identify this as a server-to-server
+        # API client rather than Python's default browser-like signature.
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Draworfit-Checkout/1.0 (+https://draworfit-production.up.railway.app)',
+        },
         method='POST',
     )
     try:
