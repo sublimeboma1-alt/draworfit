@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getProtectedDocument } from '../api/licenses'
 import { getInstallationId } from '../security/deviceIdentity'
 import { getOfflineDocument, removeOfflineDocument, saveOfflineDocument } from '../security/offlineDocuments'
@@ -9,13 +9,22 @@ export function ReaderPage({ licenseId, fileId, navigate }) {
   const [error, setError] = useState('')
   const [offlineCopy, setOfflineCopy] = useState(false)
   const [shield, setShield] = useState(false)
+  const [nativeUrl, setNativeUrl] = useState(null)
+  const nativeUrlCreated = useRef(false)
   const offlineKey = `${licenseId}:${fileId || 'main'}`
+  // Certains téléphones ne peuvent pas afficher un PDF « blob » dans une iframe :
+  // on affiche alors un lien qui ouvre le document dans le lecteur natif du téléphone.
+  const [isHandheld] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 820 && ('ontouchstart' in window || navigator.maxTouchPoints > 0))
 
   useEffect(() => {
     let objectUrl
     let cancelled = false
     const installationId = getInstallationId()
     const showBlob = (blob, availableOffline) => {
+      if (!nativeUrlCreated.current) {
+        nativeUrlCreated.current = true
+        setNativeUrl(URL.createObjectURL(blob))
+      }
       objectUrl = URL.createObjectURL(blob)
       if (!cancelled) { setOfflineCopy(availableOffline); setUrl(objectUrl) }
     }
@@ -65,5 +74,6 @@ export function ReaderPage({ licenseId, fileId, navigate }) {
   return <section className="reader-page" onContextMenu={(event) => event.preventDefault()}>
     <div className="reader-header"><button className="back-button" onClick={() => navigate('/bibliotheque')}>← Ma bibliotheque</button>{offlineCopy && <span>Disponible hors connexion sur cet appareil</span>}<button className="reader-hide" onClick={() => setShield((visible) => !visible)}>{shield ? 'Afficher' : 'Masquer'}</button></div>
     <div className="reader-frame"><iframe className="document-reader" src={`${url}#toolbar=0&navpanes=0&scrollbar=1`} title="Document protege" /><div className="reader-watermark" aria-hidden="true">DOCUMENT PROTEGE · USAGE PERSONNEL · DOCUMENT PROTEGE · USAGE PERSONNEL</div>{shield && <div className="reader-shield">Document masque</div>}</div>
+    {isHandheld && <a className="reader-open" href={nativeUrl || '#'} target="_blank" rel="noopener">Ouvrir avec le lecteur du téléphone</a>}
   </section>
 }
