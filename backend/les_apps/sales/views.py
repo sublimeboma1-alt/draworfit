@@ -29,6 +29,14 @@ COUNTRY_CODES = {
 PHONE_PREFIX_CODES = {'221': 'SN', '225': 'CI', '223': 'ML', '224': 'GN', '226': 'BF', '229': 'BJ', '237': 'CM', '33': 'FR'}
 
 
+class ChariowError(Exception):
+    """An error returned by Chariow that is safe to show to the customer."""
+
+    def __init__(self, message, status_code=status.HTTP_502_BAD_GATEWAY):
+        super().__init__(message)
+        self.status_code = status_code
+
+
 def _country_code(user):
     country = ' '.join((user.country_of_origin or '').strip().lower().replace("'", ' ').split())
     if len(country) == 2 and country.isalpha():
@@ -55,10 +63,19 @@ def _chariow_checkout(payload):
     except error.HTTPError as exc:
         body = exc.read().decode('utf-8')
         try:
-            message = json.loads(body).get('message') or 'Le paiement ne peut pas être initialisé.'
+            response = json.loads(body)
+            message = response.get('message') or 'Le paiement ne peut pas être initialisé.'
+            field_errors = response.get('errors') or {}
+            if isinstance(field_errors, dict):
+                details = '; '.join(
+                    f'{field}: {", ".join(value) if isinstance(value, list) else value}'
+                    for field, value in field_errors.items()
+                )
+                if details:
+                    message = f'{message} ({details})'
         except json.JSONDecodeError:
             message = 'Le paiement ne peut pas être initialisé.'
-        raise ValueError(message) from exc
+        raise ChariowError(message, exc.code if 400 <= exc.code < 500 else status.HTTP_502_BAD_GATEWAY) from exc
     except error.URLError as exc:
         raise RuntimeError('Chariow est momentanément inaccessible. Réessayez.') from exc
 
@@ -116,7 +133,9 @@ class OrderViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         }
         try:
             result = _chariow_checkout(payload)
-        except (RuntimeError, ValueError) as exc:
+        except ChariowError as exc:
+            return Response({'detail': str(exc)}, status=exc.status_code)
+        except RuntimeError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         data = result.get('data') or {}
         sale_id = (data.get('purchase') or {}).get('id')

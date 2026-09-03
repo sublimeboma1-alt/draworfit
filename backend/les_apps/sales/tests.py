@@ -56,3 +56,19 @@ class OrderTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['step'], 'pending')
         self.assertIn('checkout_url', response.data)
+
+    @patch('les_apps.sales.views._chariow_checkout')
+    def test_checkout_returns_chariow_validation_error_to_customer(self, mock_checkout):
+        customer = User.objects.create_user(username='validation-buyer', password='safe-password', email='buyer@example.com')
+        document = Document.objects.create(title='Configured file', price=1000, is_published=True, chariow_product_id='prd_123')
+        order = customer.orders.create(status='pending', total_amount=1000)
+        order.items.create(document=document, title=document.title, unit_price=document.price)
+        client = APIClient()
+        client.force_authenticate(customer)
+        from les_apps.sales.views import ChariowError
+        mock_checkout.side_effect = ChariowError('Produit Chariow introuvable.', 422)
+
+        response = client.post(reverse('order-checkout', args=[order.id]))
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.data['detail'], 'Produit Chariow introuvable.')

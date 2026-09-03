@@ -38,6 +38,10 @@ export function DocumentPage({ slug, navigate }) {
       else if (checkout.checkout_url) { window.location.assign(checkout.checkout_url); return }
       else setError('Le lien de paiement n’a pas été fourni. Réessayez.')
     } catch (requestError) {
+      if (requestError.status === 401) {
+        navigate('/connexion')
+        return
+      }
       setError(requestError.message || 'Cet achat ne peut pas être créé. Il a peut-être déjà été effectué.')
     } finally { setBusy(false) }
   }
