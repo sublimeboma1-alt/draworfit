@@ -1,13 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getDocument } from '../api/documents'
 
 function ChariowSnap({ html }) {
-  return <iframe
-    className="chariow-snap"
-    title="Paiement sécurisé Chariow"
-    sandbox="allow-forms allow-popups allow-scripts allow-same-origin allow-top-navigation-by-user-activation"
-    srcDoc={html}
-  />
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || !html || container.dataset.mounted === html) return
+    container.dataset.mounted = html
+    // Le code HTML Snap de Chariow (Marketing > Snap) est inséré directement
+    // dans la page : plus d'iframe ni de sandbox, donc le widget s'affiche en
+    // pleine largeur (responsive), et son formulaire / bouton Payer fonctionne
+    // normalement (la popup de checkout ne subit plus aucune restriction CORS
+    // ni les erreurs « sandboxed and lacks the allow-same-origin flag »).
+    container.innerHTML = html
+    // innerHTML n'exécute pas les balises <script> : on les recrée une par une
+    // pour que le widget Snap se lance correctement (bouton, formulaire…).
+    container.querySelectorAll('script').forEach((oldScript) => {
+      const script = document.createElement('script')
+      for (const attr of oldScript.attributes) script.setAttribute(attr.name, attr.value)
+      script.textContent = oldScript.textContent
+      oldScript.replaceWith(script)
+    })
+  }, [html])
+
+  return <div ref={containerRef} className="chariow-snap" />
 }
 
 export function DocumentPage({ slug, navigate }) {
