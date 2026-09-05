@@ -18,8 +18,8 @@ export function ReaderPage({ licenseId, fileId, navigate }) {
   const renderTokenRef = useRef(0)
   const offlineKey = `${licenseId}:${fileId || 'main'}`
 
-  async function renderBufferInto(container, buffer, cancelled, token) {
-    const loadingTask = pdfjsLib.getDocument({ data: buffer })
+  async function renderBufferInto(container, pristine, cancelled, token) {
+    const loadingTask = pdfjsLib.getDocument({ data: pristine.slice(0) })
     try {
       const pdfDoc = await loadingTask.promise
       if (cancelled || token !== renderTokenRef.current) return
@@ -53,13 +53,24 @@ export function ReaderPage({ licenseId, fileId, navigate }) {
     const installationId = getInstallationId()
 
     // Rendu PDF.js dans la page : aucun lecteur natif requis, plus d'échec sur mobile.
+    // IMPORTANT : on conserve une copie « intacte » du PDF. PDF.js transfère le
+    // ArrayBuffer au web worker et le vide ; sans cette copie, le moindre resize
+    // (rotation, barre d'adresse mobile…) utilisait un buffer vidé et affichait
+    // « Invalid PDF structure ».
     async function renderPdf(blob, availableOffline) {
       const container = scrollRef.current
       if (!container) throw new Error('Lecteur indisponible.')
-      pdfBufferRef.current = await blob.arrayBuffer()
+      pdfBufferRef.current = (await blob.arrayBuffer()).slice(0)
       if (!cancelled && availableOffline) setOfflineCopy(true)
-      await renderBufferInto(container, pdfBufferRef.current, cancelled, renderTokenRef.current)
-      if (!cancelled) setReady(true)
+      try {
+        await renderBufferInto(container, pdfBufferRef.current, cancelled, renderTokenRef.current)
+        if (!cancelled) setReady(true)
+      } catch (renderError) {
+        if (!cancelled) {
+          console.error('Échec du rendu du PDF :', renderError)
+          setError('Le document ne peut pas être ouvert : le fichier PDF est invalide ou endommagé.')
+        }
+      }
     }
     async function openOfflineCopy() {
       const blob = await getOfflineDocument(offlineKey, installationId)
@@ -99,7 +110,11 @@ export function ReaderPage({ licenseId, fileId, navigate }) {
       timeout = window.setTimeout(() => {
         renderTokenRef.current += 1
         const token = renderTokenRef.current
-        if (container && pdfBufferRef.current) renderBufferInto(container, pdfBufferRef.current, false, token)
+        if (container && pdfBufferRef.current) {
+          renderBufferInto(container, pdfBufferRef.current, false, token).catch((renderError) => {
+            console.error('Échec du re-rendu après rotation :', renderError)
+          })
+        }
       }, 250)
     }
     window.addEventListener('resize', onResize)
