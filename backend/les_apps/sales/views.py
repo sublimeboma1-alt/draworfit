@@ -11,12 +11,13 @@ from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import mixins, status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from les_apps.accounts.models import User
+from les_apps.documents.models import Document
 from les_apps.licenses.models import DocumentLicense
-from .models import Order, PaymentWebhookEvent
+from .models import Order, OrderItem, PaymentWebhookEvent
 from .serializers import OrderCreateSerializer, OrderSerializer
 
 
@@ -204,40 +205,142 @@ class SnapOnlyOrderViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixin
         return OrderCreateSerializer if self.action == 'create' else OrderSerializer
 
 
+def _extract_product_id(payload):
+    """Recover the Chariow product_id (ex. prd_xxx) from the various Pulse shapes."""
+    sale = payload.get('sale') or {}
+    product = payload.get('product') or {}
+    for candidate in (
+        sale.get('product_id'),
+        (sale.get('product') or {}).get('id'),
+        product.get('id'),
+        payload.get('product_id'),
+    ):
+        if candidate:
+            return str(candidate)
+    return None
+
+
+def _extract_customer_email(payload):
+    """Recover the buyer email from the various Pulse shapes."""
+    sale = payload.get('sale') or {}
+    customer = payload.get('customer') or {}
+    for candidate in (
+        sale.get('email'),
+        (sale.get('customer') or {}).get('email'),
+        customer.get('email'),
+        payload.get('email'),
+    ):
+        value = str(candidate or '').strip().lower()
+        if value:
+            return value
+    return None
+
+
+def _get_or_create_buyer(email):
+    """Find the buyer account, or create one (the app requires a login to activate)."""
+    buyer = User.objects.filter(email__iexact=email).first()
+    if buyer:
+        return buyer
+    base = re.sub(r'[^a-z0-9]+', '', email.split('@')[0]).lower()[:30] or 'acheteur'
+    username = base
+    index = 1
+    while User.objects.filter(username=username).exists():
+        index += 1
+        username = f'{base}{index}'
+    buyer = User(email=email, username=username)
+    buyer.set_unusable_password()
+    buyer.save()
+    return buyer
+
+
 @csrf_exempt
-@api_view(['POST'])
-@permission_classes([AllowAny])
 def chariow_webhook(request):
     """Chariow Pulse endpoint. Never trust the redirect URL as payment proof."""
+    if request.method != 'POST':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
     secret = os.environ.get('CHARIOW_WEBHOOK_SECRET', '')
     signature = request.headers.get('x-chariow-signature', '')
     expected = 'sha256=' + hmac.new(secret.encode('utf-8'), request.body, hashlib.sha256).hexdigest()
     if not secret or not hmac.compare_digest(signature, expected):
-        return JsonResponse({'detail': 'Signature Chariow invalide.'}, status=401)
+        return JsonResponse({'detail': 'Invalid Chariow signature.'}, status=401)
     try:
         payload = json.loads(request.body.decode('utf-8'))
     except (UnicodeDecodeError, json.JSONDecodeError):
-        return JsonResponse({'detail': 'JSON invalide.'}, status=400)
+        return JsonResponse({'detail': 'Invalid JSON.'}, status=400)
     delivery_id = request.headers.get('x-pulse-delivery-id')
     if not delivery_id:
-        return JsonResponse({'detail': 'Identifiant de livraison manquant.'}, status=400)
+        return JsonResponse({'detail': 'Missing delivery id.'}, status=400)
     event_name = request.headers.get('x-pulse-event') or payload.get('event', '')
-    metadata = (payload.get('sale') or {}).get('custom_metadata') or {}
-    order_id = metadata.get('order_id')
-    order = None
-    if order_id:
-        order = Order.objects.filter(pk=order_id).first()
+
+    # Store each delivery once so Chariow retries are harmless.
     try:
-        PaymentWebhookEvent.objects.create(delivery_id=delivery_id, event_name=event_name, order=order, payload=payload)
+        event = PaymentWebhookEvent.objects.create(delivery_id=delivery_id, event_name=event_name, payload=payload)
     except IntegrityError:
         return JsonResponse({'received': True, 'duplicate': True})
-    if event_name == 'successful.sale' and order:
-        sale = payload.get('sale') or {}
-        product = payload.get('product') or {}
-        item = order.items.select_related('document').first()
-        if item and product.get('id') == item.document.chariow_product_id and sale.get('id'):
+
+    if event_name != 'successful.sale':
+        return JsonResponse({'received': True})
+
+    sale = payload.get('sale') or {}
+    sale_id = str(sale.get('id') or '').strip()
+    if not sale_id:
+        logger.warning('Chariow webhook without sale.id (delivery %s)', delivery_id)
+        return JsonResponse({'received': True, 'warning': 'sale.id missing'})
+
+    # 1) Order already created by the checkout API (custom_metadata.order_id).
+    metadata = sale.get('custom_metadata') or payload.get('custom_metadata') or {}
+    order = None
+    if str(metadata.get('order_id') or '').isdigit():
+        order = Order.objects.filter(pk=int(metadata['order_id'])).first()
+
+    # 2) Otherwise, link the sale to the book via the Chariow product_id (prd_...).
+    document = None
+    email = None
+    if not order:
+        product_id = _extract_product_id(payload)
+        if product_id:
+            document = Document.objects.filter(chariow_product_id=product_id).first()
+            if document:
+                email = _extract_customer_email(payload)
+                if email:
+                    buyer = _get_or_create_buyer(email)
+                    order = Order.objects.filter(customer=buyer, status=Order.Status.PENDING, items__document=document).first()
+                    if not order:
+                        order = Order.objects.filter(customer=buyer, provider_sale_id=sale_id).first()
+            else:
+                logger.warning('Chariow sale %s for unknown product %s', sale_id, product_id)
+
+    # 3) No order yet: create a paid one with its licence.
+    if not order and document and email:
+        buyer = _get_or_create_buyer(email)
+        try:
+            with transaction.atomic():
+                order = Order.objects.create(
+                    customer=buyer,
+                    status=Order.Status.PENDING,
+                    currency=document.currency,
+                    total_amount=document.price,
+                    payment_provider='chariow',
+                    provider_sale_id=sale_id,
+                )
+                OrderItem.objects.create(order=order, document=document, title=document.title, unit_price=document.price)
+                order = _mark_order_paid(order, sale_id)
+        except IntegrityError:
+            return JsonResponse({'received': True, 'duplicate': True})
+        except ValueError as exc:
+            return JsonResponse({'detail': str(exc)}, status=409)
+
+    # Finalise a pending order.
+    if order:
+        if order.status != Order.Status.PAID:
             try:
-                _mark_order_paid(order, sale['id'])
-            except ValueError:
-                return JsonResponse({'detail': 'Commande incohérente.'}, status=409)
+                order = _mark_order_paid(order, sale_id)
+            except ValueError as exc:
+                return JsonResponse({'detail': str(exc)}, status=409)
+            except IntegrityError:
+                return JsonResponse({'received': True, 'duplicate': True})
+        elif not order.provider_sale_id:
+            order.provider_sale_id = sale_id
+            order.save(update_fields=('provider_sale_id', 'updated_at'))
+        PaymentWebhookEvent.objects.filter(pk=event.pk).update(order=order)
     return JsonResponse({'received': True})

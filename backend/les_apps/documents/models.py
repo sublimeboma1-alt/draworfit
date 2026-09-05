@@ -25,6 +25,9 @@ class Document(models.Model):
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
     price = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=3, default='XOF')
+    # Product id Chariow (ex. prd_xxxx) of the Chariow Snap widget for this book.
+    # Used by the Pulse webhook to link a paid sale to the right document/licence.
+    chariow_product_id = models.CharField(blank=True, max_length=80)
     # The Snap HTML copied from Chariow Marketing > Snap for this book.
     # It is a public widget, never a secret Chariow API key.
     chariow_snap_html = models.TextField(blank=True)
