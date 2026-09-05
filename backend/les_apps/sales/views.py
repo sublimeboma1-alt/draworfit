@@ -173,7 +173,7 @@ class OrderViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
             'first_name': first_name,
             'last_name': last_name,
             'phone': {'number': phone_number, 'country_code': country},
-            'redirect_url': f'{redirect_base}/documents/{items[0].document.slug}?payment=success&order={order.pk}',
+            'redirect_url': f'{redirect_base}/bibliotheque?payment=success&order={order.pk}',
             'customer_ip': (request.META.get('HTTP_X_FORWARDED_FOR') or request.META.get('REMOTE_ADDR') or '').split(',')[0].strip(),
             'custom_metadata': {'order_id': str(order.pk), 'order_ref': f'DRAWORFIT-{order.pk}'},
         }

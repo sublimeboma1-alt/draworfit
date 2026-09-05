@@ -1,37 +1,70 @@
 import { useEffect, useRef, useState } from 'react'
+import * as pdfjsLib from 'pdfjs-dist'
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { getProtectedDocument } from '../api/licenses'
 import { getInstallationId } from '../security/deviceIdentity'
 import { getOfflineDocument, removeOfflineDocument, saveOfflineDocument } from '../security/offlineDocuments'
 import './ReaderPage.css'
 
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+
 export function ReaderPage({ licenseId, fileId, navigate }) {
-  const [url, setUrl] = useState(null)
   const [error, setError] = useState('')
+  const [ready, setReady] = useState(false)
   const [offlineCopy, setOfflineCopy] = useState(false)
   const [shield, setShield] = useState(false)
-  const [nativeUrl, setNativeUrl] = useState(null)
-  const nativeUrlCreated = useRef(false)
+  const scrollRef = useRef(null)
+  const pdfBufferRef = useRef(null)
+  const renderTokenRef = useRef(0)
   const offlineKey = `${licenseId}:${fileId || 'main'}`
-  // Certains téléphones ne peuvent pas afficher un PDF « blob » dans une iframe :
-  // on affiche alors un lien qui ouvre le document dans le lecteur natif du téléphone.
-  const [isHandheld] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 820 && ('ontouchstart' in window || navigator.maxTouchPoints > 0))
+
+  async function renderBufferInto(container, buffer, cancelled, token) {
+    const loadingTask = pdfjsLib.getDocument({ data: buffer })
+    try {
+      const pdfDoc = await loadingTask.promise
+      if (cancelled || token !== renderTokenRef.current) return
+      const containerWidth = Math.max(container.clientWidth || 320, 320)
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      container.textContent = ''
+      for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber += 1) {
+        const page = await pdfDoc.getPage(pageNumber)
+        const baseViewport = page.getViewport({ scale: 1 })
+        const scale = dpr * (containerWidth / baseViewport.width)
+        const viewport = page.getViewport({ scale })
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.floor(viewport.width)
+        canvas.height = Math.floor(viewport.height)
+        canvas.style.width = '100%'
+        canvas.style.height = 'auto'
+        const wrap = document.createElement('div')
+        wrap.className = 'pdf-page'
+        wrap.appendChild(canvas)
+        container.appendChild(wrap)
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+        if (cancelled || token !== renderTokenRef.current) return
+      }
+    } finally {
+      loadingTask.destroy()
+    }
+  }
 
   useEffect(() => {
-    let objectUrl
     let cancelled = false
     const installationId = getInstallationId()
-    const showBlob = (blob, availableOffline) => {
-      if (!nativeUrlCreated.current) {
-        nativeUrlCreated.current = true
-        setNativeUrl(URL.createObjectURL(blob))
-      }
-      objectUrl = URL.createObjectURL(blob)
-      if (!cancelled) { setOfflineCopy(availableOffline); setUrl(objectUrl) }
+
+    // Rendu PDF.js dans la page : aucun lecteur natif requis, plus d'échec sur mobile.
+    async function renderPdf(blob, availableOffline) {
+      const container = scrollRef.current
+      if (!container) throw new Error('Lecteur indisponible.')
+      pdfBufferRef.current = await blob.arrayBuffer()
+      if (!cancelled && availableOffline) setOfflineCopy(true)
+      await renderBufferInto(container, pdfBufferRef.current, cancelled, renderTokenRef.current)
+      if (!cancelled) setReady(true)
     }
     async function openOfflineCopy() {
       const blob = await getOfflineDocument(offlineKey, installationId)
       if (!blob) throw new Error("Ce document n'est pas encore enregistre hors connexion sur cet appareil active.")
-      showBlob(blob, true)
+      await renderPdf(blob, true)
     }
     async function openDocument() {
       if (!installationId) { setError("Activez d'abord le document sur cet appareil avant de le lire."); return }
@@ -41,7 +74,7 @@ export function ReaderPage({ licenseId, fileId, navigate }) {
       }
       try {
         const blob = await getProtectedDocument(licenseId, installationId, fileId)
-        showBlob(blob, false)
+        await renderPdf(blob, false)
         try { await saveOfflineDocument(offlineKey, blob, installationId); if (!cancelled) setOfflineCopy(true) } catch { /* Online reading remains available. */ }
       } catch (networkError) {
         if (networkError.status === 401 || networkError.status === 403 || networkError.status === 404) {
@@ -53,8 +86,25 @@ export function ReaderPage({ licenseId, fileId, navigate }) {
       }
     }
     openDocument()
-    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl) }
+    return () => { cancelled = true }
   }, [licenseId, fileId, offlineKey])
+
+  // Re-rend après rotation / redimensionnement sans re-téléchargement réseau.
+  useEffect(() => {
+    if (!ready) return undefined
+    const container = scrollRef.current
+    let timeout
+    const onResize = () => {
+      window.clearTimeout(timeout)
+      timeout = window.setTimeout(() => {
+        renderTokenRef.current += 1
+        const token = renderTokenRef.current
+        if (container && pdfBufferRef.current) renderBufferInto(container, pdfBufferRef.current, false, token)
+      }, 250)
+    }
+    window.addEventListener('resize', onResize)
+    return () => { window.clearTimeout(timeout); window.removeEventListener('resize', onResize) }
+  }, [ready])
 
   useEffect(() => {
     const preventShortcut = (event) => {
@@ -70,10 +120,13 @@ export function ReaderPage({ licenseId, fileId, navigate }) {
   }, [])
 
   if (error) return <section className="page-message"><p className="error-message">{error}</p><button className="button" onClick={() => navigate('/bibliotheque')}>Retour a la bibliotheque</button></section>
-  if (!url) return <p className="page-message">Ouverture securisee du document…</p>
   return <section className="reader-page" onContextMenu={(event) => event.preventDefault()}>
     <div className="reader-header"><button className="back-button" onClick={() => navigate('/bibliotheque')}>← Ma bibliotheque</button>{offlineCopy && <span>Disponible hors connexion sur cet appareil</span>}<button className="reader-hide" onClick={() => setShield((visible) => !visible)}>{shield ? 'Afficher' : 'Masquer'}</button></div>
-    <div className="reader-frame"><iframe className="document-reader" src={`${url}#toolbar=0&navpanes=0&scrollbar=1`} title="Document protege" /><div className="reader-watermark" aria-hidden="true">DOCUMENT PROTEGE · USAGE PERSONNEL · DOCUMENT PROTEGE · USAGE PERSONNEL</div>{shield && <div className="reader-shield">Document masque</div>}</div>
-    {isHandheld && <a className="reader-open" href={nativeUrl || '#'} target="_blank" rel="noopener">Ouvrir avec le lecteur du téléphone</a>}
+    <div className="reader-frame">
+      <div className="document-scroll" ref={scrollRef} />
+      {!ready && <div className="reader-loading">Ouverture securisee du document…</div>}
+      <div className="reader-watermark" aria-hidden="true">DOCUMENT PROTEGE · USAGE PERSONNEL · DOCUMENT PROTEGE · USAGE PERSONNEL</div>
+      {shield && <div className="reader-shield">Document masque</div>}
+    </div>
   </section>
 }

@@ -21,7 +21,7 @@ async function checkout(req, res) {
   try { input = JSON.parse((await readBody(req)).toString()) } catch { return json(res, 400, { error: 'Données de paiement invalides.' }) }
   const required = ['product_id', 'email', 'first_name', 'last_name', 'phone_number', 'country_code']
   if (required.some((field) => !String(input[field] || '').trim())) return json(res, 422, { error: 'Tous les champs obligatoires doivent être renseignés.' })
-  const payload = { product_id: input.product_id.trim(), email: input.email.trim(), first_name: input.first_name.trim(), last_name: input.last_name.trim(), phone: { number: input.phone_number.replace(/\D/g, ''), country_code: input.country_code.toUpperCase() }, redirect_url: `${publicUrl(req)}/success.html?sale={sale_id}`, customer_ip: (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim() }
+  const payload = { product_id: input.product_id.trim(), email: input.email.trim(), first_name: input.first_name.trim(), last_name: input.last_name.trim(), phone: { number: input.phone_number.replace(/\D/g, ''), country_code: input.country_code.toUpperCase() }, redirect_url: `${publicUrl(req)}/bibliotheque?sale={sale_id}`, customer_ip: (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim() }
   if (input.discount_code?.trim()) payload.discount_code = input.discount_code.trim()
   try {
     const response = await fetch('https://api.chariow.com/v1/checkout', { method: 'POST', headers: { Authorization: `Bearer ${process.env.CHARIOW_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(20_000) })

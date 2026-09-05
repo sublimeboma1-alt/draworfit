@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getDocument } from '../api/documents'
+import { useAuth } from '../contexts/AuthContext'
 
 function ChariowSnap({ html }) {
   const containerRef = useRef(null)
@@ -28,6 +29,7 @@ function ChariowSnap({ html }) {
 }
 
 export function DocumentPage({ slug, navigate }) {
+  const { user, isLoading } = useAuth()
   const [document, setDocument] = useState(null)
   const [state, setState] = useState('loading')
 
@@ -38,6 +40,23 @@ export function DocumentPage({ slug, navigate }) {
   if (state === 'loading') return <p className="page-message">Chargement du document…</p>
   if (state === 'error') return <section className="page-message"><p>Ce document est introuvable.</p><button className="button" onClick={() => navigate('/catalogue')}>Retour au catalogue</button></section>
 
+  // Bloc d'achat : le paiement exige un compte. Les visiteurs voient un appel
+  // à l'action au lieu du widget Chariow, pour que chaque vente soit liée à
+  // un compte (création de la licence au bon acheteur côté webhook).
+  const purchaseArea = !document.chariow_snap_html
+    ? <p className="purchase-unavailable">Ce livre n’est pas encore disponible à l’achat.</p>
+    : isLoading
+      ? <p className="purchase-unavailable">Vérification du compte…</p>
+      : user
+        ? <ChariowSnap html={document.chariow_snap_html} />
+        : <div className="purchase-gate">
+            <p>Connectez-vous ou créez un compte pour acheter ce livre.</p>
+            <div className="purchase-gate-actions">
+              <button className="button" onClick={() => navigate('/connexion')}>Se connecter</button>
+              <button className="button button-ghost" onClick={() => navigate('/inscription')}>Créer un compte</button>
+            </div>
+          </div>
+
   return <section className="document-detail">
     <button type="button" className="back-button" onClick={() => navigate('/catalogue')}>← Catalogue</button>
     <div className="detail-layout">
@@ -47,7 +66,7 @@ export function DocumentPage({ slug, navigate }) {
         <h1>{document.title}</h1>
         <p className="detail-description">{document.description}</p>
         <p className="price">{document.price} {document.currency}</p>
-        {document.chariow_snap_html ? <ChariowSnap html={document.chariow_snap_html} /> : <p className="purchase-unavailable">Ce livre n’est pas encore disponible à l’achat.</p>}
+        {purchaseArea}
       </div>
     </div>
   </section>
