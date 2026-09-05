@@ -1,4 +1,6 @@
 /* Mobile navigation: the content stays at the top, navigation stays reachable. */
+.navigation-panel .main-nav a.nav-logout { display: none; }
+
 @media (max-width: 760px) {
   .site-header {
     display: block !important;
@@ -72,6 +74,20 @@
   .guest-header .main-nav a:nth-child(2)::before { content: "ⓘ"; }
   .guest-header .main-nav a:nth-child(3)::before { content: "◉"; }
   .navigation-panel .main-nav a:hover, .navigation-panel .main-nav a:focus-visible { background: #e8f5ec !important; color: #167947; outline: none; }
+
+  .navigation-panel .main-nav a.nav-logout,
+  .guest-header .main-nav a.nav-logout {
+    display: grid;
+    grid-column: 1 / -1;
+    min-height: 44px;
+    color: #9b2020;
+    border-top: 1px solid #f0e3e3;
+  }
+  .navigation-panel .main-nav a.nav-logout::before,
+  .guest-header .main-nav a.nav-logout::before { content: "⏻"; }
+  .navigation-panel .main-nav a.nav-logout:hover,
+  .navigation-panel .main-nav a.nav-logout:focus-visible,
+  .guest-header .main-nav a.nav-logout:hover { background: #fdecec !important; color: #7d1717 !important; }
 
   .app-shell main { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
   .app-shell footer { margin-bottom: calc(82px + env(safe-area-inset-bottom)); }
